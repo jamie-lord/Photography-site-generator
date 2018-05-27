@@ -11,16 +11,17 @@ namespace PhotographySiteGenerator
 {
     public class Program
     {
+        private static readonly DirectoryInfo _outputDirectory = new DirectoryInfo(@"D:\Photography site output");
+
         public static void Main(string[] args)
         {
             DirectoryInfo inputDirectory = new DirectoryInfo(@"D:\Published photos");
-            DirectoryInfo outputDirectory = new DirectoryInfo(@"D:\Photography site output");
 
-            foreach (FileInfo file in outputDirectory.EnumerateFiles())
+            foreach (FileInfo file in _outputDirectory.EnumerateFiles())
             {
                 file.Delete();
             }
-            foreach (DirectoryInfo dir in outputDirectory.EnumerateDirectories())
+            foreach (DirectoryInfo dir in _outputDirectory.EnumerateDirectories())
             {
                 dir.Delete(true);
             }
@@ -47,7 +48,7 @@ namespace PhotographySiteGenerator
                     }
                 }
 
-                outputDirectory.CreateSubdirectory(gallery.Uri);
+                _outputDirectory.CreateSubdirectory(gallery.Uri);
 
                 foreach (FileInfo photoFile in galleryDir.EnumerateFiles())
                 {
@@ -61,32 +62,21 @@ namespace PhotographySiteGenerator
                     {
                         using (MagickImage image = new MagickImage(photoFile))
                         {
-                            var imagePath = Path.Combine(gallery.Uri, photoFile.Name);
-
-                            // Need to get/store metadata here as compressed image losses exif data
-                            var exif = image.GetExifProfile();
-
                             var photograph = new Photograph()
                             {
-                                Path = imagePath,
-                                DateTime = exif.GetValue(ExifTag.DateTimeOriginal).Value?.ToString(),
-                                Camera = exif.GetValue(ExifTag.Make).Value?.ToString() + " " + exif.GetValue(ExifTag.Model).Value?.ToString(),
-                                Lens = exif.GetValue(ExifTag.LensModel).Value?.ToString(),
-                                Fstop = exif.GetValue(ExifTag.FNumber).Value?.ToString(),
-                                Exposure = exif.GetValue(ExifTag.ExposureTime).Value?.ToString(),
-                                FocalLength = exif.GetValue(ExifTag.FocalLength).Value?.ToString(),
-                                Iso = exif.GetValue(ExifTag.ISOSpeedRatings).Value?.ToString()
+                                FileName = photoFile.Name
                             };
+                            photograph.ParseMetadata(image.GetExifProfile());
 
                             gallery.Photographs.Add(photograph);
 
-                            string filePath = Path.Combine(outputDirectory.FullName, imagePath);
+                            string filePath = Path.Combine(_outputDirectory.FullName, gallery.Uri, photoFile.Name);
                             ProcessImage(image, maxImageDimension, filePath);
 
                             // Need to create a thumbnail image for the gallery index
                             if (gallery.Thumbnail == photoFile.Name)
                             {
-                                string thumbnailPath = Path.Combine(outputDirectory.FullName, Path.Combine(gallery.Uri, "thumbnail.jpg"));
+                                string thumbnailPath = Path.Combine(_outputDirectory.FullName, Path.Combine(gallery.Uri, "thumbnail.jpg"));
                                 ProcessImage(image, 1024, thumbnailPath);
                             }
                         }
@@ -98,6 +88,16 @@ namespace PhotographySiteGenerator
                 }
             }
 
+            MakeIndex(galleries);
+
+            foreach (var gallery in galleries)
+            {
+                MakeGallery(gallery);
+            }
+        }
+
+        private static void MakeIndex(IEnumerable<Gallery> galleries)
+        {
             var indexPage = GetTemplate("index");
 
             var galleryCards = string.Empty;
@@ -109,7 +109,23 @@ namespace PhotographySiteGenerator
 
             indexPage = InsertContent(indexPage, new Dictionary<string, string> { { "GALLERY_CARDS", galleryCards } });
 
-            File.WriteAllText(Path.Combine(outputDirectory.FullName, "index.html"), indexPage);
+            File.WriteAllText(Path.Combine(_outputDirectory.FullName, "index.html"), indexPage);
+        }
+
+        private static void MakeGallery(Gallery gallery)
+        {
+            var galleryPage = GetTemplate("gallery");
+
+            var galleryCards = string.Empty;
+
+            foreach (var photo in gallery.Photographs)
+            {
+                galleryCards += photo.GenerateGalleryCard();
+            }
+
+            galleryPage = InsertContent(galleryPage, new Dictionary<string, string> { { "IMAGE_CARDS", galleryCards } });
+
+            File.WriteAllText(Path.Combine(_outputDirectory.FullName, gallery.Uri, "gallery.html"), galleryPage);
         }
 
         private static void ProcessImage(MagickImage image, int maxImageDimension, string filePath)
@@ -122,7 +138,7 @@ namespace PhotographySiteGenerator
             {
                 image.Resize(0, maxImageDimension);
             }
-            
+
             image.Write(filePath);
             ImageOptimizer optimizer = new ImageOptimizer();
             optimizer.OptimalCompression = true;
@@ -174,23 +190,23 @@ namespace PhotographySiteGenerator
 
         public string GenerateIndexCard()
         {
-            var galleryCard = Program.GetTemplate("index_gallery_card");
+            var indexGalleryCard = Program.GetTemplate("index_gallery_card");
 
-            galleryCard = Program.InsertContent(galleryCard, new Dictionary<string, string> {
-                { "LINK", Uri },
+            indexGalleryCard = Program.InsertContent(indexGalleryCard, new Dictionary<string, string> {
+                { "LINK", Uri + "/gallery.html" },
                 { "IMAGE", Uri + "/thumbnail.jpg" },
                 { "ALT", Name },
                 { "TITLE", Name },
                 { "DESCRIPTION", Description }
             });
 
-            return galleryCard;
+            return indexGalleryCard;
         }
     }
 
     public class Photograph
     {
-        public string Path { get; set; }
+        public string FileName { get; set; }
         public string DateTime { get; set; }
         public string Camera { get; set; }
         public string Lens { get; set; }
@@ -198,5 +214,42 @@ namespace PhotographySiteGenerator
         public string Exposure { get; set; }
         public string Iso { get; set; }
         public string FocalLength { get; set; }
+
+        public string GenerateGalleryCard()
+        {
+            var galleryCard = Program.GetTemplate("gallery_card");
+
+            galleryCard = Program.InsertContent(galleryCard, new Dictionary<string, string>
+            {
+                { "IMAGE_URI", FileName }
+            });
+
+            return galleryCard;
+        }
+
+        public void ParseMetadata(ExifProfile exifProfile)
+        {
+            DateTime = TryParseExif(exifProfile, ExifTag.DateTimeOriginal);
+            Camera = TryParseExif(exifProfile, ExifTag.Make) + " " + TryParseExif(exifProfile, ExifTag.Model);
+            Lens = TryParseExif(exifProfile, ExifTag.LensModel);
+            Fstop = TryParseExif(exifProfile, ExifTag.FNumber);
+            Exposure = TryParseExif(exifProfile, ExifTag.ExposureTime);
+            FocalLength = TryParseExif(exifProfile, ExifTag.FocalLength);
+            Iso = TryParseExif(exifProfile, ExifTag.ISOSpeedRatings);
+        }
+
+        private string TryParseExif(ExifProfile exifProfile, ExifTag exifTag)
+        {
+            var result = string.Empty;
+            try
+            {
+                result = exifProfile.GetValue(exifTag).Value?.ToString();
+            }
+            catch (Exception ex)
+            {
+                //Console.WriteLine(ex);
+            }
+            return result;
+        }
     }
 }

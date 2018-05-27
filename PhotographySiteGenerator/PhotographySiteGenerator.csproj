@@ -6,11 +6,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Templates\gallery.html" />
+    <None Remove="Templates\gallery_card.html" />
     <None Remove="Templates\index.html" />
     <None Remove="Templates\index_gallery_card.html" />
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Templates\gallery.html" />
+    <EmbeddedResource Include="Templates\gallery_card.html" />
     <EmbeddedResource Include="Templates\index.html" />
     <EmbeddedResource Include="Templates\index_gallery_card.html" />
   </ItemGroup>
