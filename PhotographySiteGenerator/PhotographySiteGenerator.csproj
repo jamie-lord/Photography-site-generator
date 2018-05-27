@@ -6,6 +6,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Templates\index.html" />
+    <None Remove="Templates\index_gallery_card.html" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\index.html" />
+    <EmbeddedResource Include="Templates\index_gallery_card.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="7.4.6" />
     <PackageReference Include="YamlDotNet" Version="4.3.1" />
   </ItemGroup>
