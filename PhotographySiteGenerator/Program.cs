@@ -125,7 +125,7 @@ namespace PhotographySiteGenerator
 
             galleryPage = InsertContent(galleryPage, new Dictionary<string, string> { { "IMAGE_CARDS", galleryCards } });
 
-            File.WriteAllText(Path.Combine(_outputDirectory.FullName, gallery.Uri, "gallery.html"), galleryPage);
+            File.WriteAllText(Path.Combine(_outputDirectory.FullName, gallery.Uri, "index.html"), galleryPage);
         }
 
         private static void ProcessImage(MagickImage image, int maxImageDimension, string filePath)
@@ -193,7 +193,7 @@ namespace PhotographySiteGenerator
             var indexGalleryCard = Program.GetTemplate("index_gallery_card");
 
             indexGalleryCard = Program.InsertContent(indexGalleryCard, new Dictionary<string, string> {
-                { "LINK", Uri + "/gallery.html" },
+                { "LINK", Uri },
                 { "IMAGE", Uri + "/thumbnail.jpg" },
                 { "ALT", Name },
                 { "TITLE", Name },
