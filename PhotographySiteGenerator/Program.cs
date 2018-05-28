@@ -72,13 +72,6 @@ namespace PhotographySiteGenerator
 
                             string filePath = Path.Combine(_outputDirectory.FullName, gallery.Uri, photoFile.Name);
                             ProcessImage(image, maxImageDimension, filePath);
-
-                            // Need to create a thumbnail image for the gallery index
-                            if (gallery.Thumbnail == photoFile.Name)
-                            {
-                                string thumbnailPath = Path.Combine(_outputDirectory.FullName, Path.Combine(gallery.Uri, "thumbnail.jpg"));
-                                ProcessImage(image, 1024, thumbnailPath);
-                            }
                         }
                     }
                     catch (Exception ex)
@@ -194,7 +187,7 @@ namespace PhotographySiteGenerator
 
             indexGalleryCard = Program.InsertContent(indexGalleryCard, new Dictionary<string, string> {
                 { "LINK", Uri },
-                { "IMAGE", Uri + "/thumbnail.jpg" },
+                { "IMAGE", Uri + "/" + Thumbnail },
                 { "ALT", Name },
                 { "TITLE", Name },
                 { "DESCRIPTION", Description }
